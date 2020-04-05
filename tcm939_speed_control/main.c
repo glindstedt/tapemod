@@ -47,8 +47,12 @@ ISR(ADC_vect) {
     Avg1 = ADCH;
     ADCData1[i1] = ADCH;
     i1++;
-    if (i1 > (ADC_BUFFER_SIZE - 1)) i1 = 0;
-    for (j = 0; j <= (ADC_BUFFER_SIZE - 1); j++) Avg1 += ADCData1[j];
+    if (i1 > (ADC_BUFFER_SIZE - 1)) {
+      i1 = 0;
+    }
+    for (j = 0; j <= (ADC_BUFFER_SIZE - 1); j++) {
+      Avg1 += ADCData1[j];
+    }
     ADMUX |= 0x02;  // set to read another channel in next int
   }
   // get channel 3
@@ -56,8 +60,12 @@ ISR(ADC_vect) {
     Avg2 = ADCH;
     ADCData2[i2] = ADCH;
     i2++;
-    if (i2 > (ADC_BUFFER_SIZE - 1)) i2 = 0;
-    for (j = 0; j <= (ADC_BUFFER_SIZE - 1); j++) Avg2 += ADCData2[j];
+    if (i2 > (ADC_BUFFER_SIZE - 1)) {
+      i2 = 0;
+    }
+    for (j = 0; j <= (ADC_BUFFER_SIZE - 1); j++) {
+      Avg2 += ADCData2[j];
+    }
     ADMUX &= 0xFD;  // set to read another channel in next int
   }
   // PW below 30% is useless, motor stops
@@ -66,7 +74,9 @@ ISR(ADC_vect) {
   // ...to make control over low speeds (PW < 60%) finer
   // add channels
   Mix = ((Avg1 + Avg2) / ADC_BUFFER_SIZE);
-  if (Mix > 0x00FF) Mix = 0xFF;
+  if (Mix > 0x00FF) {
+    Mix = 0xFF;
+  }
   OCR0A = pgm_read_byte(&(ADCtoPW[Mix]));
 }
 
