@@ -2,49 +2,23 @@
 Cassette player speed controller with CV input
 *** PWM inside ***
 
-EEPROM usage: 0 byte(s), 0,0% of EEPROM
-Program size: 454 words (908 bytes), 88,7% of FLASH
-
 Chip type               : ATtiny13
 AVR Core Clock frequency: 9,600000 MHz
 *****************************************************/
 
 #define F_CPU 1000000L
 
-/*
-#include <tiny13.h>
-*/
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/power.h>
 #include <avr/sleep.h>
 #include <avr/pgmspace.h>
 
-//#include "typedefs.h"
 #include "lookups.h"
 
-/*
-#define LED PORTB.4 
-*/
 #define LED PB4
 #define ADC_BUFFER_SIZE 8
           
-// Timer 0 overflow interrupt service routine
-// Overflow frequency: ~150Hz
-// most tasks are done via hardware, so I have plenty of computing power (and flash) for LED blinking!
-// this interrupt SR eats exactly 20% of program memory :)
-/*
-interrupt [TIM0_OVF] void timer0_ovf_isr(void)
-{
-    static uint8_t Counter=0;
-    
-    if((Counter++)>(255/(OCR0A>>4))-14)  //strange formula for nice LED frequency response
-    {
-        LED=~LED; 
-        Counter=0;   
-    } 
-}
-*/
 ISR(TIM0_OVF_vect)
 {
     static uint8_t Counter = 0;
@@ -60,9 +34,6 @@ ISR(TIM0_OVF_vect)
 // sampling rate: ~150 Hz, per 2 channels (~75 Hz per channel)
 // averaging: 8 samples (11% of flash)
 // ADMUX=0x21 - channel 1, ADMUX=0x23 - channel 3
-/*
-interrupt [ADC_INT] void adc_isr(void)
-*/
 ISR(ADC_vect)
 {   
     static uint8_t ADCData1[ADC_BUFFER_SIZE]; 
@@ -101,26 +72,15 @@ ISR(ADC_vect)
     // converts 0-255 value to 77-255 range in a nonlinear way...
     // ...to make control over low speeds (PW < 60%) finer    
     // add channels  
-    //Mix=((Avg1 + Avg2) / ADC_BUFFER_SIZE);
-    //if(Mix>0x00FF) Mix=0xFF;
-    //OCR0A = pgm_read_byte(&(ADCtoPW[Mix]));
-    //Mix=((Avg1 + Avg2) / ADC_BUFFER_SIZE);
-    //if(Mix>0x00FF) Mix=0xFF;
-    OCR0A = pgm_read_byte(&(ADCtoPW[Avg1]));
+    Mix=((Avg1 + Avg2) / ADC_BUFFER_SIZE);
+    if(Mix>0x00FF) Mix=0xFF;
+    OCR0A = pgm_read_byte(&(ADCtoPW[Mix]));
 }
 
 //int main(void) __attribute__((noreturn));
 int main(void)
 {
     // Crystal Oscillator division factor: 1
-    /*
-    #pragma optsize-
-    CLKPR=0x80;
-    CLKPR=0x00;
-    #ifdef _OPTIMIZE_SIZE_
-    #pragma optsize+
-    #endif
-    */
     clock_prescale_set(clock_div_1);
 
     // Input/Output Ports initialization
@@ -172,12 +132,8 @@ int main(void)
     ADCSRB |= 0x04;
 
     // Global enable interrupts
-    /* #asm("sei") */
     sei();
 
-    /*
-    while (1){}
-    */
     for (;;) {
 	// TODO does this matter?
         //sleep_mode();
