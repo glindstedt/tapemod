@@ -1,3 +1,6 @@
+# AVR
+*.hex
+
 # Prerequisites
 *.d
 
