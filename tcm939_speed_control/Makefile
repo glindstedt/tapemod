@@ -6,14 +6,17 @@ OBJ2HEX=/usr/bin/avr-objcopy
 AVRDUDE=/usr/bin/avrdude
 TARGET=main
 BAUDRATE=8000
+SRC=main.c lookups.h
 
-all:
+all: main.hex
+
+main.hex: $(SRC)
 	$(CC) $(CFLAGS) $(TARGET).c -o $(TARGET)
 	$(OBJ2HEX) -R .eeprom -O ihex $(TARGET) $(TARGET).hex
 	rm -f $(TARGET)
 
 
-install: all
+install: main.hex
 	sudo $(AVRDUDE) -p $(AVRDUDEMCU) -P /dev/spidev0.0 -c linuxspi -b $(BAUDRATE) -U flash:w:$(TARGET).hex
 
 fuse:

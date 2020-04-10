@@ -53,7 +53,7 @@ ISR(ADC_vect) {
     for (j = 0; j <= (ADC_BUFFER_SIZE - 1); j++) {
       Avg1 += ADCData1[j];
     }
-    ADMUX |= 0x02;  // set to read another channel in next int
+    ADMUX ^= 0x02;  // flip MUX1 bit to switch to channel 3
   }
   // get channel 3
   else {
@@ -66,7 +66,7 @@ ISR(ADC_vect) {
     for (j = 0; j <= (ADC_BUFFER_SIZE - 1); j++) {
       Avg2 += ADCData2[j];
     }
-    ADMUX &= 0xFD;  // set to read another channel in next int
+    ADMUX ^= 0x02;  // flip MUX1 bit to switch to channel 1
   }
   // PW below 30% is useless, motor stops
   // ADCtoPW is a lookup table;
@@ -94,12 +94,13 @@ int main(void) {
 
   // Timer/Counter 0 initialization
   // Clock source: System Clock
-  // Clock value: 37,500 kHz
   // Mode: Phase correct PWM top=0xFF
   // OC0A output: Non-Inverted PWM
   // OC0B output: Disconnected
   TCCR0A = 0x81;
-  TCCR0B = 0x04;
+  // Clock prescaling /1: value = 37,500 kHz
+  TCCR0B = 0x01;
+  // Reset registers
   TCNT0 = 0x00;
   OCR0A = 0x00;
   OCR0B = 0x00;
@@ -125,13 +126,22 @@ int main(void) {
   // ADC Auto Trigger Source: Timer0 Overflow
   // Only the 8 most significant bits of
   // the AD conversion result are used
-  // Digital input buffers on ADC0: On, ADC1: On, ADC2: On, ADC3: On
-  DIDR0 &= 0x03;
-  DIDR0 |= 0x00;
-  ADMUX = 0x21;  // Vcc reference, channel 1
+  // TODO maybe disable ADC0? does it matter?
+  DIDR0 = 0x03;  // Enabled: ADC0,ADC1,ADC2,ADC3  Disabled: AIN0,AIN1
+
+  /*
+   * We set the ADLAR Left Adjust Result bit in ADMUX here:
+   * > If the result is left adjusted and no more than 8-bit
+   * > precision is required, it is sufficient to read ADCH
+   */
+  ADMUX = 0x21;  // Enable ADLAR, select ADC channel 1 (PB2)
+  // Enable ADC, Auto Trigger mode, and ADC Conversion Complete Interrupt
+  // ADC clock prescale division factor = 128
   ADCSRA = 0xAF;
-  ADCSRB &= 0xF8;
-  ADCSRB |= 0x04;
+  // Auto Trigger source selection: Timer/Counter Overflow
+  //ADCSRB &= 0xF8;
+  //ADCSRB |= 0x04;
+  ADCSRB = 0x04;
 
   // Global enable interrupts
   sei();
