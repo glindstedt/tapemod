@@ -22,7 +22,7 @@ AVR Core Clock frequency: 9,600000 MHz
 ISR(TIM0_OVF_vect) {
   static uint8_t Counter = 0;
   // strange formula for nice LED frequency response
-  if ((Counter++) > (255 / (OCR0A >> 4)) - 14) {
+  if ((Counter++) > (255 / (OCR0B >> 4)) - 14) {
     PORTB ^= _BV(LED);
     Counter = 0;
   }
@@ -77,7 +77,9 @@ ISR(ADC_vect) {
   if (Mix > 0x00FF) {
     Mix = 0xFF;
   }
-  OCR0A = pgm_read_byte(&(ADCtoPW[Mix]));
+
+  // Set Output Compare Register value
+  OCR0B = pgm_read_byte(&(ADCtoPW[Mix]));
 }
 
 // int main(void) __attribute__((noreturn));
@@ -89,21 +91,39 @@ int main(void) {
   // Port B initialization
   // Func5=In Func4=Out Func3=In Func2=In Func1=In Func0=Out
   // State5=T State4=0 State3=T State2=T State1=T State0=0
-  PORTB = 0x00;
-  DDRB = 0x11;
+  // Set internal pull-up on PB0
+  PORTB = 0x01;
+  // Set PB4 and PB1 as outputs
+  DDRB = 0x12;
 
   // Timer/Counter 0 initialization
   // Clock source: System Clock
   // Mode: Phase correct PWM top=0xFF
   // OC0A output: Non-Inverted PWM
   // OC0B output: Disconnected
-  TCCR0A = 0x81;
+
+  // clk_IO = 9_600_000 Hz
+  // For Phase Correct PWM
+  // If TOP = 0xFF then a complete cycle would count up and down once
+  // Given that it's an 8-bit counter this should take 2 * 2^8 = 512 cycles
+  // This gives 9600000 / (2 * 2^8) = 18750 Hz
+  // If we want to aim for 25 kHz for example, we would need to set TOP = OCR0A,
+  // and set OCR0A to the value from this formula:
+  // x = 9600000 / (2 * 25000) = 192
+  // 192 in hex is 0xC0
+
+  //TCCR0A = 0x81;  // Phase correct PWM (mode 1)
+  //TCCR0A = 0x83;  // Fast PWM (mode 3)
+  // Fast PWM (mode 7), TOP = OCR0A
+  TCCR0A = 0x21; // Phase correct PWM (mode 5)
   // Clock prescaling /1: value = 37,500 kHz
-  TCCR0B = 0x01;
+  TCCR0B = 0x09;
   // Reset registers
   TCNT0 = 0x00;
-  OCR0A = 0x00;
-  OCR0B = 0x00;
+  OCR0B = 0x00; // Used for duty cycle
+  // Aim for desired frequency
+  OCR0A = 0xC0;
+  //OCR0A = 0x18;
 
   // External Interrupt(s) initialization
   // INT0: Off
