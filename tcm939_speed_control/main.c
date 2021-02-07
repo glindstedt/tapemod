@@ -122,7 +122,8 @@ int main(void) {
   TCNT0 = 0x00;
   OCR0B = 0x00; // Used for duty cycle
   // Aim for desired frequency
-  OCR0A = 0xC0;
+  //OCR0A = 0x89;
+  OCR0A = 0xA0;
   //OCR0A = 0x18;
 
   // External Interrupt(s) initialization
