@@ -21,6 +21,7 @@ AVR Core Clock frequency: 9,600000 MHz
 
 ISR(TIM0_OVF_vect) {
   static uint8_t Counter = 0;
+  // TODO update formula
   // strange formula for nice LED frequency response
   if ((Counter++) > (255 / (OCR0B >> 4)) - 14) {
     PORTB ^= _BV(LED);
@@ -42,42 +43,53 @@ ISR(ADC_vect) {
   uint16_t Mix = 0;
   uint8_t j;
 
-  // get channel 1
+  // {{{ UPDATE CURRENT BUFFER
+
+  // Get channel 1
   if (ADMUX == 0x21) {
-    Avg1 = ADCH;
     ADCData1[i1] = ADCH;
     i1++;
     if (i1 > (ADC_BUFFER_SIZE - 1)) {
       i1 = 0;
     }
-    for (j = 0; j <= (ADC_BUFFER_SIZE - 1); j++) {
-      Avg1 += ADCData1[j];
-    }
-    ADMUX ^= 0x02;  // flip MUX1 bit to switch to channel 3
   }
-  // get channel 3
+  // Get channel 3
   else {
-    Avg2 = ADCH;
     ADCData2[i2] = ADCH;
     i2++;
     if (i2 > (ADC_BUFFER_SIZE - 1)) {
       i2 = 0;
     }
-    for (j = 0; j <= (ADC_BUFFER_SIZE - 1); j++) {
-      Avg2 += ADCData2[j];
-    }
-    ADMUX ^= 0x02;  // flip MUX1 bit to switch to channel 1
   }
-  // PW below 30% is useless, motor stops
-  // ADCtoPW is a lookup table;
-  // converts 0-255 value to 77-255 range in a nonlinear way...
-  // ...to make control over low speeds (PW < 60%) finer
-  // add channels
-  Mix = ((Avg1 + Avg2) / ADC_BUFFER_SIZE);
-  if (Mix > 0x00FF) {
-    Mix = 0xFF;
+  ADMUX ^= 0x02;  // flip MUX1 bit to switch between channel 1 and 3
+
+  // }}}
+
+  // Get buffer averages
+  Avg1 = 0;
+  Avg2 = 0;
+  for (j = 0; j <= (ADC_BUFFER_SIZE - 1); j++) {
+    Avg1 += ADCData1[j];
+  }
+  for (j = 0; j <= (ADC_BUFFER_SIZE - 1); j++) {
+    Avg2 += ADCData2[j];
   }
 
+  // Mix
+  //Avg1 = Avg1 / ADC_BUFFER_SIZE;
+  //Avg2 = Avg2 / ADC_BUFFER_SIZE;
+  //Mix = (Avg1 + Avg2) / 2;
+  // This way of mixing saturates at 50% + 50% = 100%,
+  // however 0% + 100% = 100% and 0% + 0% = 0%, which is desirable
+  // and otherwise not achievable without added components
+  Mix = (Avg1 + Avg2) / ADC_BUFFER_SIZE;
+
+  // Prevent index out of bounds
+  if (Mix > (ADC_TO_PW_SIZE - 1)) {
+    Mix = ADC_TO_PW_SIZE - 1;
+  }
+
+  // ADCtoPW is a lookup table; convert from 0-255 index
   // Set Output Compare Register value
   OCR0B = pgm_read_byte(&(ADCtoPW[Mix]));
 }
@@ -147,8 +159,7 @@ int main(void) {
   // ADC Auto Trigger Source: Timer0 Overflow
   // Only the 8 most significant bits of
   // the AD conversion result are used
-  // TODO maybe disable ADC0? does it matter?
-  DIDR0 = 0x03;  // Enabled: ADC0,ADC1,ADC2,ADC3  Disabled: AIN0,AIN1
+  DIDR0 = 0x33;  // Enabled: ADC1,ADC3  Disabled: ADC0,ADC2,AIN0,AIN1
 
   /*
    * We set the ADLAR Left Adjust Result bit in ADMUX here:
@@ -158,7 +169,8 @@ int main(void) {
   ADMUX = 0x21;  // Enable ADLAR, select ADC channel 1 (PB2)
   // Enable ADC, Auto Trigger mode, and ADC Conversion Complete Interrupt
   // ADC clock prescale division factor = 128
-  ADCSRA = 0xAF;
+  // division factor 32 helped with glitches where pot was high but cv pulled low. maybe using a 10k pot would help if ADC conversion is slow
+  ADCSRA = 0xAD;
   // Auto Trigger source selection: Timer/Counter Overflow
   //ADCSRB &= 0xF8;
   //ADCSRB |= 0x04;
